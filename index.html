@@ -4,6 +4,36 @@
     <meta charset="utf-8">
     <title>ESP32 XR Hand Tracking Target Game</title>
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+
+    <script>
+        // ========================================================
+        // הגדרת ה-WebSocket (מנוטרל זמנית לבדיקה)
+        // ========================================================
+        const socket = null;
+
+        // ========================================================
+        // רישום הרכיב חובה לפני ה-HTML!
+        // הקוד הזה יקשיב לכל פעם שרשת היד הווירטואלית נוגעת בבלון
+        // ========================================================
+        AFRAME.registerComponent('collider-check', {
+            init: function () {
+                this.el.addEventListener('raycaster-intersection', (evt) => {
+                    const intersectedEls = evt.detail.els;
+                    intersectedEls.forEach(targetEntity => {
+                        if (targetEntity.classList.contains('target')) {
+                            // 1. העלמת הבלון
+                            targetEntity.parentNode.removeChild(targetEntity);
+                            
+                            // 2. שליחה ל-ESP32 (יופעל בהמשך)
+                            if (socket && socket.readyState === 1) {
+                                socket.send("BALLOON_POPPED");
+                            }
+                        }
+                    });
+                });
+            }
+        });
+    </script>
 </head>
 <body style="margin: 0; overflow: hidden;">
 
@@ -26,60 +56,32 @@
                   raycaster="objects: .target; far: 0.15; showLine: false; enabled: true"
                   collider-check>
         </a-entity>
+
         <a-entity id="targets-container"></a-entity>
 
-        <a-sphere id="test-balloon" class="target" color="blue" radius="0.12" position="0 1.4 -0.6"></a-sphere>
+        <a-sphere id="test-balloon" class="target" color="blue" radius="0.1" position="0 1.4 -0.5"></a-sphere>
 
     </a-scene>
 
     <script>
         const container = document.getElementById('targets-container');
 
-        // הגדרת רכיב WebSocket ריק זמנית
-        const socket = null;
-
-        // ========================================================
-        // הרישום של רכיב הזיהוי החדש של A-Frame
-        // המנגנון הזה מקשיב אוטומטית ברמת החומרה מתי היד נוגעת בבלון
-        // ========================================================
-        AFRAME.registerComponent('collider-check', {
-            init: function () {
-                // ברגע שקרן הטווח הקצרה של היד (15 ס"מ) נוגעת בבלון
-                this.el.addEventListener('raycaster-intersection', function (evt) {
-                    const intersectedEls = evt.detail.els;
-                    intersectedEls.forEach(targetEntity => {
-                        if (targetEntity.classList.contains('target')) {
-                            
-                            // 1. מחיקת הבלון מהמסך
-                            targetEntity.remove(); 
-                            
-                            // 2. שליחת פקודה ל-ESP32 (אם יהיה מחובר בעתיד)
-                            if (socket && socket.readyState === 1) {
-                                socket.send("BALLOON_POPPED");
-                            }
-                        }
-                    });
-                });
-            }
-        });
-        // ========================================================
-
         // מנגנון ייצור אוטומטי: בלון אדום חדש בכל 4 שניות
         setInterval(() => {
             spawnTarget();
         }, 4000); 
 
-        // פונקציה לייצור בלונים אדומים (קרובים יותר מול הפנים - 60 ס"מ)
+        // פונקציה לייצור בלונים אדומים קרובים ונוחים
         function spawnTarget() {
             const newTarget = document.createElement('a-sphere');
             newTarget.setAttribute('class', 'target');
             newTarget.setAttribute('color', 'red');
-            newTarget.setAttribute('radius', '0.12'); // כדורים קצת יותר קטנים ומדויקים
+            newTarget.setAttribute('radius', '0.1');
 
-            // מיקומים רנדומליים קרובים מאוד ונגישים במרכז שדה הראייה
-            const x = (Math.random() * 0.6) - 0.3;   // 30 ס"מ שמאלה או ימינה
-            const y = (Math.random() * 0.3) + 1.3;   // גובה נוח (1.3 עד 1.6 מטר)
-            const z = -(Math.random() * 0.4) - 0.4;  // מרחק קרוב קדימה (40 עד 80 ס"מ מהפנים)
+            // מיקומים נגישים במרחק נגיעה קל
+            const x = (Math.random() * 0.4) - 0.2;   // 20 ס"מ ימינה או שמאלה
+            const y = (Math.random() * 0.2) + 1.3;   // גובה נוח
+            const z = -(Math.random() * 0.3) - 0.4;  // קרוב מאוד (40 עד 70 ס"מ)
 
             newTarget.setAttribute('position', `${x} ${y} ${z}`);
             container.appendChild(newTarget);
