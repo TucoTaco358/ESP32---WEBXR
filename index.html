@@ -7,7 +7,7 @@
 </head>
 <body style="margin: 0; overflow: hidden;">
 
-    <a-scene xr-mode-ui="XRMode: xr" webxr="requiredFeatures: local-floor; optionalFeatures: hand-tracking, hit-test;">
+    <a-scene xr-mode-ui="XRMode: xr" webxr="optionalFeatures: local-floor, hand-tracking, hit-test;">
         
         <a-sky id="background" color="#000000" material="transparent: true; opacity: 0;"></a-sky>
 
@@ -29,6 +29,15 @@
         const leftHand = document.getElementById('leftHand');
         const rightHand = document.getElementById('rightHand');
 
+        // ========================================================
+        // תקשורת חומרה (מנוטרלת כרגע לצורך בדיקת יציבות ה-VR)
+        // ========================================================
+        const socket = null; 
+        /* const esp32IP = "192.168.43.50"; 
+        const socket = new WebSocket(`ws://${esp32IP}:81`);
+        */
+        // ========================================================
+
         // לולאת בדיקת התנגשויות (רצה בכל 50 מילישניות)
         setInterval(() => {
             const targets = document.querySelectorAll('.target');
@@ -38,42 +47,48 @@
             });
         }, 50);
 
-        // מנגנון ייצור אוטומטי: בלון חדש בכל 3 שניות (3000ms)
+        // מנגנון ייצור אוטומטי: בלון אדום חדש מתווסף לחדר בכל 3 שניות
         setInterval(() => {
             spawnTarget();
         }, 3000); 
 
-        // פונקציית בדיקת מרחק והתנגשות
+        // פונקציית בדיקת המרחק המעודכנת בדיוק מרחבי (World Coordinates)
         function checkHandCollision(targetEntity, handEntity) {
             if (!targetEntity || !targetEntity.object3D) return;
-            const targetPos = targetEntity.object3D.position;
-
             if (!handEntity || !handEntity.object3D || !handEntity.object3D.visible) return;
-            const handPos = handEntity.object3D.position;
 
-            const distance = Math.sqrt(
-                Math.pow(targetPos.x - handPos.x, 2) +
-                Math.pow(targetPos.y - handPos.y, 2) +
-                Math.pow(targetPos.z - handPos.z, 2)
-            );
+            // שליחת מיקום הבלון והיד למערכת צירים עולמית אחידה
+            const targetPos = new THREE.Vector3();
+            targetEntity.object3D.getWorldPosition(targetPos);
 
-            // פגיעה בבלון (מרחק קטן מ-25 ס"מ)
-            if (distance < 0.25) {
-                targetEntity.remove(); // מחיקת הבלון מהסצנה
+            const handPos = new THREE.Vector3();
+            handEntity.object3D.getWorldPosition(handPos);
+
+            // חישוב המרחק הוקטורי המדויק ביניהם
+            const distance = targetPos.distanceTo(handPos);
+
+            // טווח פגיעה של 35 ס"מ - רגיש ונוח לפגיעה עם כף היד
+            if (distance < 0.35) {
+                targetEntity.remove(); // העלמת הבלון מהמסך במיידי
+                
+                // שליחת דיווח ל-ESP32 (רק אם החיבור פעיל בעתיד)
+                if (socket && socket.readyState === 1) { // 1 = WebSocket.OPEN
+                    socket.send("BALLOON_POPPED");
+                }
             }
         }
 
-        // פונקציה לייצור בלונים אדומים
+        // פונקציה לייצור בלונים אדומים בטווח הראייה והנגיעה של המשתמש
         function spawnTarget() {
             const newTarget = document.createElement('a-sphere');
             newTarget.setAttribute('class', 'target');
             newTarget.setAttribute('color', 'red');
             newTarget.setAttribute('radius', '0.15');
 
-            // מיקומים רנדומליים קרובים מול הפנים
-            const x = (Math.random() * 1.0) - 0.5;   
-            const y = (Math.random() * 0.4) + 1.3;   
-            const z = -(Math.random() * 0.5) - 0.4;  
+            // מיקומים רנדומליים נוחים במרחב שמול המשתמש
+            const x = (Math.random() * 1.0) - 0.5;   // 50 ס"מ שמאלה עד 50 ס"מ ימינה
+            const y = (Math.random() * 0.4) + 1.3;   // גובה נוח מושט ליד (1.3 עד 1.7 מטר)
+            const z = -(Math.random() * 0.5) - 0.4;  // מרחק קדימה (40 עד 90 ס"מ מהפנים)
 
             newTarget.setAttribute('position', `${x} ${y} ${z}`);
             container.appendChild(newTarget);
