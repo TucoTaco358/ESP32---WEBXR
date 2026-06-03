@@ -33,34 +33,34 @@
         // ========================================================
         // הגדרת תקשורת WebSocket מול ה-ESP32
         // ========================================================
-        const esp32IP = "10.244.180.29"; // חובה לוודא שזה ה-IP העדכני מהסיריאל מוניטור!
-        let socket = null;
+       // const esp32IP = "10.244.180.29"; // חובה לוודא שזה ה-IP העדכני מהסיריאל מוניטור!
+       // let socket = null;
 
-        try {
-            socket = new WebSocket(`ws://${esp32IP}:81`);
+     //   try {
+     //       socket = new WebSocket(`ws://${esp32IP}:81`);
 
-            socket.onopen = () => {
-                console.log("Connected to ESP32!");
-                statusText.setAttribute('value', 'ESP32: Connected! 🟢');
-                statusText.setAttribute('color', 'green');
-            };
+      //      socket.onopen = () => {
+      //          console.log("Connected to ESP32!");
+       //         statusText.setAttribute('value', 'ESP32: Connected! 🟢');
+       //         statusText.setAttribute('color', 'green');
+       //     };
 
-            socket.onclose = () => {
-                console.log("Disconnected from ESP32");
-                statusText.setAttribute('value', 'ESP32: Disconnected 🔴');
-                statusText.setAttribute('color', 'red');
-            };
+        //    socket.onclose = () => {
+         //       console.log("Disconnected from ESP32");
+         //       statusText.setAttribute('value', 'ESP32: Disconnected 🔴');
+         //       statusText.setAttribute('color', 'red');
+       //     };
 
-            socket.onerror = (error) => {
-                console.error("WebSocket Error", error);
-                statusText.setAttribute('value', 'ESP32: Connection Error ⚠️');
-                statusText.setAttribute('color', 'orange');
-            };
-        } catch (e) {
-            console.error("WebSocket Creation Failed", e);
-            statusText.setAttribute('value', 'ESP32: Setup Failed ❌');
-            statusText.setAttribute('color', 'red');
-        }
+       //     socket.onerror = (error) => {
+       //         console.error("WebSocket Error", error);
+       //         statusText.setAttribute('value', 'ESP32: Connection Error ⚠️');
+       //         statusText.setAttribute('color', 'orange');
+     //       };
+   //     } catch (e) {
+    //        console.error("WebSocket Creation Failed", e);
+    //        statusText.setAttribute('value', 'ESP32: Setup Failed ❌');
+     //       statusText.setAttribute('color', 'red');
+  //      }
         // ========================================================
 
         // לולאת בדיקת התנגשויות (רצה בכל 50 מילישניות)
@@ -96,8 +96,8 @@
                 targetEntity.remove(); // מחיקת הבלון מהסצנה
                 
                 // שליחת פקודת הפיצוץ ל-ESP32
-                if (socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send("BALLOON_POPPED");
+           //     if (socket && socket.readyState === WebSocket.OPEN) {
+          //          socket.send("BALLOON_POPPED");
                 }
             }
         }
