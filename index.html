@@ -15,80 +15,71 @@
             <a-camera id="head" look-controls="enabled: false" wasd-controls="enabled: false" position="0 1.6 0"></a-camera>
         </a-entity>
 
-        <a-entity id="leftHand" hand-tracking-controls="hand: left; modelStyle: mesh;"></a-entity>
-        <a-entity id="rightHand" hand-tracking-controls="hand: right; modelStyle: mesh;"></a-entity>
+        <a-entity id="leftHand" 
+                  hand-tracking-controls="hand: left; modelStyle: mesh;"
+                  raycaster="objects: .target; far: 0.15; showLine: false; enabled: true"
+                  collider-check>
+        </a-entity>
 
+        <a-entity id="rightHand" 
+                  hand-tracking-controls="hand: right; modelStyle: mesh;"
+                  raycaster="objects: .target; far: 0.15; showLine: false; enabled: true"
+                  collider-check>
+        </a-entity>
         <a-entity id="targets-container"></a-entity>
 
-        <a-sphere id="test-balloon" class="target" color="blue" radius="0.15" position="0 1.5 -1"></a-sphere>
+        <a-sphere id="test-balloon" class="target" color="blue" radius="0.12" position="0 1.4 -0.6"></a-sphere>
 
     </a-scene>
 
     <script>
         const container = document.getElementById('targets-container');
-        const leftHand = document.getElementById('leftHand');
-        const rightHand = document.getElementById('rightHand');
+
+        // הגדרת רכיב WebSocket ריק זמנית
+        const socket = null;
 
         // ========================================================
-        // תקשורת חומרה (מנוטרלת כרגע לצורך בדיקת יציבות ה-VR)
+        // הרישום של רכיב הזיהוי החדש של A-Frame
+        // המנגנון הזה מקשיב אוטומטית ברמת החומרה מתי היד נוגעת בבלון
         // ========================================================
-        const socket = null; 
-        /* const esp32IP = "192.168.43.50"; 
-        const socket = new WebSocket(`ws://${esp32IP}:81`);
-        */
+        AFRAME.registerComponent('collider-check', {
+            init: function () {
+                // ברגע שקרן הטווח הקצרה של היד (15 ס"מ) נוגעת בבלון
+                this.el.addEventListener('raycaster-intersection', function (evt) {
+                    const intersectedEls = evt.detail.els;
+                    intersectedEls.forEach(targetEntity => {
+                        if (targetEntity.classList.contains('target')) {
+                            
+                            // 1. מחיקת הבלון מהמסך
+                            targetEntity.remove(); 
+                            
+                            // 2. שליחת פקודה ל-ESP32 (אם יהיה מחובר בעתיד)
+                            if (socket && socket.readyState === 1) {
+                                socket.send("BALLOON_POPPED");
+                            }
+                        }
+                    });
+                });
+            }
+        });
         // ========================================================
 
-        // לולאת בדיקת התנגשויות (רצה בכל 50 מילישניות)
-        setInterval(() => {
-            const targets = document.querySelectorAll('.target');
-            targets.forEach(target => {
-                checkHandCollision(target, leftHand);
-                checkHandCollision(target, rightHand);
-            });
-        }, 50);
-
-        // מנגנון ייצור אוטומטי: בלון אדום חדש מתווסף לחדר בכל 3 שניות
+        // מנגנון ייצור אוטומטי: בלון אדום חדש בכל 4 שניות
         setInterval(() => {
             spawnTarget();
-        }, 3000); 
+        }, 4000); 
 
-        // פונקציית בדיקת המרחק המעודכנת בדיוק מרחבי (World Coordinates)
-        function checkHandCollision(targetEntity, handEntity) {
-            if (!targetEntity || !targetEntity.object3D) return;
-            if (!handEntity || !handEntity.object3D || !handEntity.object3D.visible) return;
-
-            // שליחת מיקום הבלון והיד למערכת צירים עולמית אחידה
-            const targetPos = new THREE.Vector3();
-            targetEntity.object3D.getWorldPosition(targetPos);
-
-            const handPos = new THREE.Vector3();
-            handEntity.object3D.getWorldPosition(handPos);
-
-            // חישוב המרחק הוקטורי המדויק ביניהם
-            const distance = targetPos.distanceTo(handPos);
-
-            // טווח פגיעה של 35 ס"מ - רגיש ונוח לפגיעה עם כף היד
-            if (distance < 0.35) {
-                targetEntity.remove(); // העלמת הבלון מהמסך במיידי
-                
-                // שליחת דיווח ל-ESP32 (רק אם החיבור פעיל בעתיד)
-                if (socket && socket.readyState === 1) { // 1 = WebSocket.OPEN
-                    socket.send("BALLOON_POPPED");
-                }
-            }
-        }
-
-        // פונקציה לייצור בלונים אדומים בטווח הראייה והנגיעה של המשתמש
+        // פונקציה לייצור בלונים אדומים (קרובים יותר מול הפנים - 60 ס"מ)
         function spawnTarget() {
             const newTarget = document.createElement('a-sphere');
             newTarget.setAttribute('class', 'target');
             newTarget.setAttribute('color', 'red');
-            newTarget.setAttribute('radius', '0.15');
+            newTarget.setAttribute('radius', '0.12'); // כדורים קצת יותר קטנים ומדויקים
 
-            // מיקומים רנדומליים נוחים במרחב שמול המשתמש
-            const x = (Math.random() * 1.0) - 0.5;   // 50 ס"מ שמאלה עד 50 ס"מ ימינה
-            const y = (Math.random() * 0.4) + 1.3;   // גובה נוח מושט ליד (1.3 עד 1.7 מטר)
-            const z = -(Math.random() * 0.5) - 0.4;  // מרחק קדימה (40 עד 90 ס"מ מהפנים)
+            // מיקומים רנדומליים קרובים מאוד ונגישים במרכז שדה הראייה
+            const x = (Math.random() * 0.6) - 0.3;   // 30 ס"מ שמאלה או ימינה
+            const y = (Math.random() * 0.3) + 1.3;   // גובה נוח (1.3 עד 1.6 מטר)
+            const z = -(Math.random() * 0.4) - 0.4;  // מרחק קרוב קדימה (40 עד 80 ס"מ מהפנים)
 
             newTarget.setAttribute('position', `${x} ${y} ${z}`);
             container.appendChild(newTarget);
