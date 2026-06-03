@@ -28,17 +28,17 @@
         const rightHand = document.getElementById('rightHand');
 
         // ========================================================
-        // הגדרת תקשורת WebSocket מול ה-ESP32
+        // החזרת חיבור ה-WebSocket מול ה-ESP32
         // ========================================================
-        const esp32IP = "192.168.43.50"; // ודא שזה ה-IP הנוכחי של הבקר מההוטספוט
+        const esp32IP = "192.168.43.50"; // ודא שזה ה-IP האקטאולי מהסיריאל
         const socket = new WebSocket(`ws://${esp32IP}:81`);
 
-        socket.onopen = () => console.log("Connected to ESP32!");
+        socket.onopen = () => console.log("Connected to ESP32 Hardware!");
         socket.onclose = () => console.log("Disconnected from ESP32");
         socket.onerror = (error) => console.error("WebSocket Error: ", error);
         // ========================================================
 
-        // לולאת בדיקת התנגשויות (רצה כל 50 מילישניות)
+        // לולאת בדיקת התנגשויות (רצה בכל 50 מילישניות)
         setInterval(() => {
             const targets = document.querySelectorAll('.target');
             targets.forEach(target => {
@@ -46,6 +46,14 @@
                 checkHandCollision(target, rightHand);
             });
         }, 50);
+
+        // ========================================================
+        // מנגנון ייצור אוטומטי: בלון חדש בכל 3 שניות (3000ms)
+        // ========================================================
+        setInterval(() => {
+            spawnTarget();
+        }, 3000); 
+        // ========================================================
 
         // פונקציית בדיקת מרחק והתנגשות
         function checkHandCollision(targetEntity, handEntity) {
@@ -61,30 +69,28 @@
                 Math.pow(targetPos.z - handPos.z, 2)
             );
 
+            // פגיעה בבלון (טווח של 25 ס"מ)
             if (distance < 0.25) {
-                targetEntity.remove(); // מחיקת הבלון שנגעו בו
+                targetEntity.remove(); // מחיקת הבלון מהסצנה
                 
-                // שליחת הדיווח החומרתי ל-ESP32
+                // שליחת פקודת הפיצוץ בצינור ל-ESP32
                 if (socket && socket.readyState === WebSocket.OPEN) {
                     socket.send("BALLOON_POPPED");
                 }
-
-                // יצירת בלון חדש במקום אקראי
-                spawnTarget();
             }
         }
 
-        // פונקציה לייצור מטרות חדשות בצורה בטוחה
+        // פונקציה לייצור בלונים אדומים במרחב הנגיש של החדר
         function spawnTarget() {
             const newTarget = document.createElement('a-sphere');
             newTarget.setAttribute('class', 'target');
             newTarget.setAttribute('color', 'red');
             newTarget.setAttribute('radius', '0.15');
 
-            // מיקומים רנדומליים קרובים מול המשתמש
-            const x = (Math.random() * 1.0) - 0.5; // בין 50 ס"מ שמאלה ל-50 ס"מ ימינה
-            const y = (Math.random() * 0.4) + 1.3; // גובה הכתפיים/עיניים (1.3 עד 1.7 מטר)
-            const z = -(Math.random() * 0.5) - 0.4; // מרחק קדימה בין 40 ס"מ ל-90 ס"מ
+            // מיקומים רנדומליים קרובים מול הפנים
+            const x = (Math.random() * 1.0) - 0.5;   // 50 ס"מ ימינה או שמאלה
+            const y = (Math.random() * 0.4) + 1.3;   // גובה נוח לידיים (1.3 עד 1.7 מטר)
+            const z = -(Math.random() * 0.5) - 0.4;  // מרחק קדימה (40 עד 90 ס"מ)
 
             newTarget.setAttribute('position', `${x} ${y} ${z}`);
             container.appendChild(newTarget);
