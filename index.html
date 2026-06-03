@@ -1,9 +1,3 @@
-#ifndef WEB_PAGE_H
-#define WEB_PAGE_H
-
-#include <Arduino.h>
-
-const char HTML_GAME_PAGE[] PROGMEM = R"=====(
 <!DOCTYPE html>
 <html>
 <head>
@@ -15,7 +9,7 @@ const char HTML_GAME_PAGE[] PROGMEM = R"=====(
 
     <a-scene xr-mode-ui="XRMode: xr" webxr="optionalFeatures: hit-test; requiredFeatures: local-floor, hand-tracking;">
         
-        <a-entity id="cameraRig" position="0 0 0">
+        <a-entity id=\"cameraRig\" position="0 0 0">
             <a-camera id="head" look-controls="enabled: false"></a-camera>
         </a-entity>
 
@@ -31,33 +25,44 @@ const char HTML_GAME_PAGE[] PROGMEM = R"=====(
         const leftHand = document.getElementById('leftHand');
         const rightHand = document.getElementById('rightHand');
 
-        // יצירת המטרה הראשונה במשחק
+        // ========================================================
+        // הגדרת תקשורת WebSocket מול ה-ESP32
+        // ========================================================
+        // חובה להחליף את ה-IP למטה ב-IP האמיתי שהבקר מקבל מההוטספוט שלך!
+        const esp32IP = "10.244.180.29"; 
+        const socket = new WebSocket(`ws://${esp32IP}:81`);
+
+        socket.onopen = () => {
+            console.log("Connected to ESP32 Hardware WebSocket Server!");
+        };
+
+        socket.onclose = () => {
+            console.log("Disconnected from ESP32");
+        };
+
+        socket.onerror = (error) => {
+            console.error("WebSocket Error: ", error);
+        };
+        // ========================================================
+
+        // יצירת מטרה ראשונה בתחילת המשחק
         spawnTarget();
 
-        // לולאת הרינדור הראשית של המשחק - רצה בכל פריים (למשל 90 או 120 פעמים בשנייה)
-        function gameLoop() {
+        // לולאת הרצה קבועה של ה-A-Frame (מריצה בדיקות התנגשות בכל פריים)
+        setInterval(() => {
             const targets = document.querySelectorAll('.target');
-            
             targets.forEach(target => {
-                const targetPos = target.object3D.position;
-
-                // בדיקת מרחק בין המטרה ליד ימין וליד שמאל
-                checkHandCollision(target, targetPos, rightHand);
-                checkHandCollision(target, targetPos, leftHand);
+                checkHandCollision(target, leftHand);
+                checkHandCollision(target, rightHand);
             });
+        }, 50);
 
-            // בקשה מהדפדפן להריץ את הלולאה שוב בפריים הבא
-            requestAnimationFrame(gameLoop);
-        }
+        // פונקציית בדיקת מרחק והתנגשות בין כפות הידיים לבלון
+        function checkHandCollision(targetEntity, handEntity) {
+            if (!targetEntity || !targetEntity.object3D) return;
+            const targetPos = targetEntity.object3D.position;
 
-        // תחילת ריצת לולאת בדיקת הנגיעות
-        requestAnimationFrame(gameLoop);
-
-        // פונקציה שמחשבת מרחק תלת-ממדי בין היד לבלון
-        function checkHandCollision(targetEntity, targetPos, handEntity) {
-            // אם היד לא מזוהה כרגע במרחב, נדלג על הבדיקה
-            if (!handEntity.object3D || !handEntity.object3D.visible) return;
-
+            if (!handEntity || !handEntity.object3D || !handEntity.object3D.visible) return;
             const handPos = handEntity.object3D.position;
 
             // נוסחת מרחק בתלת-ממד (משפט פיתגורס תלת-ממדי)
@@ -70,21 +75,27 @@ const char HTML_GAME_PAGE[] PROGMEM = R"=====(
             // אם המרחק בין כף היד למרכז הבלון קטן מ-0.3 מטר (30 ס"מ) - נחשב כנגיעה!
             if (distance < 0.3) {
                 targetEntity.remove(); // העלמת הבלון שנגעו בו
+                
+                // שליחת דיווח חומרתי ל-ESP32 בזמן אמת על הפיצוץ
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send("BALLOON_POPPED");
+                }
+
                 spawnTarget();         // יצירת בלון חדש במקום אחר בחדר
             }
         }
 
-        // פונקציה לייצור מטרות במיקומים אקראיים קרובים (כדי שתוכל להגיע אליהן עם היד)
+        // פונקציה לייצור מטרות במיקומים אקראיים קרובים
         function spawnTarget() {
             const newTarget = document.createElement('a-sphere');
             newTarget.setAttribute('class', 'target');
             newTarget.setAttribute('color', 'red');
             newTarget.setAttribute('radius', '0.2'); // בלון ברדיוס 20 ס"מ
 
-            // מיקומים בהישג יד: חצי מטר ימינה/שמאלה, בגובה החזה, ומרחק של חצי מטר עד מטר לפנים
-            const x = (Math.random() - 0.5) * 1.2;
-            const y = 1.0 + Math.random() * 0.6;
-            const z = -(0.4 + Math.random() * 0.6);
+            // מיקומים בהישג יד: X בין -1 ל-1, Y גובה עיניים 1.2 עד 1.8, Z מרחק קדימה -0.5 עד -1.5
+            const x = (Math.random() * 2) - 1;
+            const y = (Math.random() * 0.6) + 1.2;
+            const z = -(Math.random() * 1.0) - 0.5;
 
             newTarget.setAttribute('position', `${x} ${y} ${z}`);
             container.appendChild(newTarget);
@@ -92,6 +103,3 @@ const char HTML_GAME_PAGE[] PROGMEM = R"=====(
     </script>
 </body>
 </html>
-)=====";
-
-#endif
