@@ -1,0 +1,97 @@
+#ifndef WEB_PAGE_H
+#define WEB_PAGE_H
+
+#include <Arduino.h>
+
+const char HTML_GAME_PAGE[] PROGMEM = R"=====(
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>ESP32 XR Hand Tracking Target Game</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+</head>
+<body style="margin: 0; overflow: hidden;">
+
+    <a-scene xr-mode-ui="XRMode: xr" webxr="optionalFeatures: hit-test; requiredFeatures: local-floor, hand-tracking;">
+        
+        <a-entity id="cameraRig" position="0 0 0">
+            <a-camera id="head" look-controls="enabled: false"></a-camera>
+        </a-entity>
+
+        <a-entity id="leftHand" hand-tracking-controls="hand: left; modelStyle: mesh;"></a-entity>
+        <a-entity id="rightHand" hand-tracking-controls="hand: right; modelStyle: mesh;"></a-entity>
+
+        <a-entity id="targets-container"></a-entity>
+
+    </a-scene>
+
+    <script>
+        const container = document.getElementById('targets-container');
+        const leftHand = document.getElementById('leftHand');
+        const rightHand = document.getElementById('rightHand');
+
+        // יצירת המטרה הראשונה במשחק
+        spawnTarget();
+
+        // לולאת הרינדור הראשית של המשחק - רצה בכל פריים (למשל 90 או 120 פעמים בשנייה)
+        function gameLoop() {
+            const targets = document.querySelectorAll('.target');
+            
+            targets.forEach(target => {
+                const targetPos = target.object3D.position;
+
+                // בדיקת מרחק בין המטרה ליד ימין וליד שמאל
+                checkHandCollision(target, targetPos, rightHand);
+                checkHandCollision(target, targetPos, leftHand);
+            });
+
+            // בקשה מהדפדפן להריץ את הלולאה שוב בפריים הבא
+            requestAnimationFrame(gameLoop);
+        }
+
+        // תחילת ריצת לולאת בדיקת הנגיעות
+        requestAnimationFrame(gameLoop);
+
+        // פונקציה שמחשבת מרחק תלת-ממדי בין היד לבלון
+        function checkHandCollision(targetEntity, targetPos, handEntity) {
+            // אם היד לא מזוהה כרגע במרחב, נדלג על הבדיקה
+            if (!handEntity.object3D || !handEntity.object3D.visible) return;
+
+            const handPos = handEntity.object3D.position;
+
+            // נוסחת מרחק בתלת-ממד (משפט פיתגורס תלת-ממדי)
+            const distance = Math.sqrt(
+                Math.pow(targetPos.x - handPos.x, 2) +
+                Math.pow(targetPos.y - handPos.y, 2) +
+                Math.pow(targetPos.z - handPos.z, 2)
+            );
+
+            // אם המרחק בין כף היד למרכז הבלון קטן מ-0.3 מטר (30 ס"מ) - נחשב כנגיעה!
+            if (distance < 0.3) {
+                targetEntity.remove(); // העלמת הבלון שנגעו בו
+                spawnTarget();         // יצירת בלון חדש במקום אחר בחדר
+            }
+        }
+
+        // פונקציה לייצור מטרות במיקומים אקראיים קרובים (כדי שתוכל להגיע אליהן עם היד)
+        function spawnTarget() {
+            const newTarget = document.createElement('a-sphere');
+            newTarget.setAttribute('class', 'target');
+            newTarget.setAttribute('color', 'red');
+            newTarget.setAttribute('radius', '0.2'); // בלון ברדיוס 20 ס"מ
+
+            // מיקומים בהישג יד: חצי מטר ימינה/שמאלה, בגובה החזה, ומרחק של חצי מטר עד מטר לפנים
+            const x = (Math.random() - 0.5) * 1.2;
+            const y = 1.0 + Math.random() * 0.6;
+            const z = -(0.4 + Math.random() * 0.6);
+
+            newTarget.setAttribute('position', `${x} ${y} ${z}`);
+            container.appendChild(newTarget);
+        }
+    </script>
+</body>
+</html>
+)=====";
+
+#endif
