@@ -31,16 +31,16 @@
         const statusText = document.getElementById('status-text');
 
         // ========================================================
-        // הגדרת תקשורת WebSocket מול ה-ESP32 עם הגנה מפני קריסות
+        // הגדרת תקשורת WebSocket מול ה-ESP32
         // ========================================================
-        const esp32IP = "10.244.180.29"; // ודא שזה ה-IP הנוכחי של הבקר מהסיריאל
+        const esp32IP = "192.168.43.50"; // חובה לוודא שזה ה-IP העדכני מהסיריאל מוניטור!
         let socket = null;
 
         try {
             socket = new WebSocket(`ws://${esp32IP}:81`);
 
             socket.onopen = () => {
-                console.log("Connected to ESP32 Hardware!");
+                console.log("Connected to ESP32!");
                 statusText.setAttribute('value', 'ESP32: Connected! 🟢');
                 statusText.setAttribute('color', 'green');
             };
@@ -52,12 +52,12 @@
             };
 
             socket.onerror = (error) => {
-                console.error("WebSocket Error: ", error);
+                console.error("WebSocket Error", error);
                 statusText.setAttribute('value', 'ESP32: Connection Error ⚠️');
                 statusText.setAttribute('color', 'orange');
             };
         } catch (e) {
-            console.error("Failed to create WebSocket:", e);
+            console.error("WebSocket Creation Failed", e);
             statusText.setAttribute('value', 'ESP32: Setup Failed ❌');
             statusText.setAttribute('color', 'red');
         }
@@ -91,11 +91,11 @@
                 Math.pow(targetPos.z - handPos.z, 2)
             );
 
-            // פגיעה בבלון
+            // פגיעה בבלון (מרחק קטן מ-25 ס"מ)
             if (distance < 0.25) {
                 targetEntity.remove(); // מחיקת הבלון מהסצנה
                 
-                // שליחת פקודת הפיצוץ בצינור ל-ESP32 (רק אם החיבור פתוח ותקין)
+                // שליחת פקודת הפיצוץ ל-ESP32
                 if (socket && socket.readyState === WebSocket.OPEN) {
                     socket.send("BALLOON_POPPED");
                 }
