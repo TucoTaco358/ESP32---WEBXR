@@ -9,7 +9,7 @@
 
     <a-scene xr-mode-ui="XRMode: xr" webxr="optionalFeatures: hit-test; requiredFeatures: local-floor, hand-tracking;">
         
-        <a-entity id=\"cameraRig\" position="0 0 0">
+        <a-entity id="cameraRig" position="0 0 0">
             <a-camera id="head" look-controls="enabled: false"></a-camera>
         </a-entity>
 
@@ -17,6 +17,8 @@
         <a-entity id="rightHand" hand-tracking-controls="hand: right; modelStyle: mesh;"></a-entity>
 
         <a-entity id="targets-container"></a-entity>
+
+        <a-sphere id="test-balloon" class="target" color="blue" radius="0.15" position="0 1.5 -1"></a-sphere>
 
     </a-scene>
 
@@ -28,27 +30,15 @@
         // ========================================================
         // הגדרת תקשורת WebSocket מול ה-ESP32
         // ========================================================
-        // חובה להחליף את ה-IP למטה ב-IP האמיתי שהבקר מקבל מההוטספוט שלך!
-        const esp32IP = "10.244.180.29"; 
-        //const socket = new WebSocket(`ws://${esp32IP}:81`);
+        const esp32IP = "192.168.43.50"; // שנה ל-IP האמיתי שלך
+        const socket = new WebSocket(`ws://${esp32IP}:81`);
 
-        socket.onopen = () => {
-            console.log("Connected to ESP32 Hardware WebSocket Server!");
-        };
-
-        socket.onclose = () => {
-            console.log("Disconnected from ESP32");
-        };
-
-        socket.onerror = (error) => {
-            console.error("WebSocket Error: ", error);
-        };
+        socket.onopen = () => console.log("Connected to ESP32!");
+        socket.onclose = () => console.log("Disconnected from ESP32");
+        socket.onerror = (error) => console.error("WebSocket Error: ", error);
         // ========================================================
 
-        // יצירת מטרה ראשונה בתחילת המשחק
-        spawnTarget();
-
-        // לולאת הרצה קבועה של ה-A-Frame (מריצה בדיקות התנגשות בכל פריים)
+        // לולאת בדיקת התנגשויות (רצה כל 50 מילישניות)
         setInterval(() => {
             const targets = document.querySelectorAll('.target');
             targets.forEach(target => {
@@ -57,7 +47,7 @@
             });
         }, 50);
 
-        // פונקציית בדיקת מרחק והתנגשות בין כפות הידיים לבלון
+        // פונקציית בדיקת מרחק והתנגשות
         function checkHandCollision(targetEntity, handEntity) {
             if (!targetEntity || !targetEntity.object3D) return;
             const targetPos = targetEntity.object3D.position;
@@ -65,37 +55,36 @@
             if (!handEntity || !handEntity.object3D || !handEntity.object3D.visible) return;
             const handPos = handEntity.object3D.position;
 
-            // נוסחת מרחק בתלת-ממד (משפט פיתגורס תלת-ממדי)
             const distance = Math.sqrt(
                 Math.pow(targetPos.x - handPos.x, 2) +
                 Math.pow(targetPos.y - handPos.y, 2) +
                 Math.pow(targetPos.z - handPos.z, 2)
             );
 
-            // אם המרחק בין כף היד למרכז הבלון קטן מ-0.3 מטר (30 ס"מ) - נחשב כנגיעה!
-            if (distance < 0.3) {
-                targetEntity.remove(); // העלמת הבלון שנגעו בו
+            if (distance < 0.25) {
+                targetEntity.remove(); // מחיקת הבלון שנגעו בו
                 
-                // שליחת דיווח חומרתי ל-ESP32 בזמן אמת על הפיצוץ
+                // שליחת הדיווח החומרתי ל-ESP32
                 if (socket && socket.readyState === WebSocket.OPEN) {
                     socket.send("BALLOON_POPPED");
                 }
 
-                spawnTarget();         // יצירת בלון חדש במקום אחר בחדר
+                // יצירת בלון חדש במקום אקראי
+                spawnTarget();
             }
         }
 
-        // פונקציה לייצור מטרות במיקומים אקראיים קרובים
+        // פונקציה לייצור מטרות חדשות בצורה בטוחה
         function spawnTarget() {
             const newTarget = document.createElement('a-sphere');
             newTarget.setAttribute('class', 'target');
             newTarget.setAttribute('color', 'red');
-            newTarget.setAttribute('radius', '0.2'); // בלון ברדיוס 20 ס"מ
+            newTarget.setAttribute('radius', '0.15');
 
-            // מיקומים בהישג יד: X בין -1 ל-1, Y גובה עיניים 1.2 עד 1.8, Z מרחק קדימה -0.5 עד -1.5
-            const x = (Math.random() * 2) - 1;
-            const y = (Math.random() * 0.6) + 1.2;
-            const z = -(Math.random() * 1.0) - 0.5;
+            // מיקומים רנדומליים נוחים מול המשתמש
+            const x = (Math.random() * 1.2) - 0.6; // בין 60 ס"מ שמאלה ל-60 ס"מ ימינה
+            const y = (Math.random() * 0.5) + 1.3; // גובה הכתפיים/עיניים (1.3 עד 1.8 מטר)
+            const z = -(Math.random() * 0.6) - 0.4; // מרחק קדימה בין 40 ס"מ למטר
 
             newTarget.setAttribute('position', `${x} ${y} ${z}`);
             container.appendChild(newTarget);
