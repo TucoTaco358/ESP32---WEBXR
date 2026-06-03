@@ -7,8 +7,10 @@
 </head>
 <body style="margin: 0; overflow: hidden;">
 
-    <a-scene xr-mode-ui="XRMode: xr" webxr="optionalFeatures: hit-test; requiredFeatures: local-floor, hand-tracking;">
+    <a-scene xr-mode-ui="XRMode: xr" webxr="requiredFeatures: local-floor; optionalFeatures: hand-tracking, hit-test;">
         
+        <a-sky id="background" color="#000000" material="transparent: true; opacity: 0;"></a-sky>
+
         <a-entity id="cameraRig" position="0 0 0">
             <a-camera id="head" look-controls="enabled: false" wasd-controls="enabled: false" position="0 1.6 0"></a-camera>
         </a-entity>
@@ -20,48 +22,12 @@
 
         <a-sphere id="test-balloon" class="target" color="blue" radius="0.15" position="0 1.5 -1"></a-sphere>
 
-        <a-text id="status-text" value="ESP32: Connecting..." color="yellow" position="-0.6 2.2 -1.2" scale="0.6 0.6 0.6"></a-text>
-
     </a-scene>
 
     <script>
         const container = document.getElementById('targets-container');
         const leftHand = document.getElementById('leftHand');
         const rightHand = document.getElementById('rightHand');
-        const statusText = document.getElementById('status-text');
-
-        // ========================================================
-        // הגדרת תקשורת WebSocket מול ה-ESP32
-        // ========================================================
-       // const esp32IP = "10.244.180.29"; // חובה לוודא שזה ה-IP העדכני מהסיריאל מוניטור!
-       // let socket = null;
-
-     //   try {
-     //       socket = new WebSocket(`ws://${esp32IP}:81`);
-
-      //      socket.onopen = () => {
-      //          console.log("Connected to ESP32!");
-       //         statusText.setAttribute('value', 'ESP32: Connected! 🟢');
-       //         statusText.setAttribute('color', 'green');
-       //     };
-
-        //    socket.onclose = () => {
-         //       console.log("Disconnected from ESP32");
-         //       statusText.setAttribute('value', 'ESP32: Disconnected 🔴');
-         //       statusText.setAttribute('color', 'red');
-       //     };
-
-       //     socket.onerror = (error) => {
-       //         console.error("WebSocket Error", error);
-       //         statusText.setAttribute('value', 'ESP32: Connection Error ⚠️');
-       //         statusText.setAttribute('color', 'orange');
-     //       };
-   //     } catch (e) {
-    //        console.error("WebSocket Creation Failed", e);
-    //        statusText.setAttribute('value', 'ESP32: Setup Failed ❌');
-     //       statusText.setAttribute('color', 'red');
-  //      }
-        // ========================================================
 
         // לולאת בדיקת התנגשויות (רצה בכל 50 מילישניות)
         setInterval(() => {
@@ -94,11 +60,6 @@
             // פגיעה בבלון (מרחק קטן מ-25 ס"מ)
             if (distance < 0.25) {
                 targetEntity.remove(); // מחיקת הבלון מהסצנה
-                
-                // שליחת פקודת הפיצוץ ל-ESP32
-           //     if (socket && socket.readyState === WebSocket.OPEN) {
-          //          socket.send("BALLOON_POPPED");
-                }
             }
         }
 
