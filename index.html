@@ -20,22 +20,47 @@
 
         <a-sphere id="test-balloon" class="target" color="blue" radius="0.15" position="0 1.5 -1"></a-sphere>
 
+        <a-text id="status-text" value="ESP32: Connecting..." color="yellow" position="-0.6 2.2 -1.2" scale="0.6 0.6 0.6"></a-text>
+
     </a-scene>
 
     <script>
         const container = document.getElementById('targets-container');
         const leftHand = document.getElementById('leftHand');
         const rightHand = document.getElementById('rightHand');
+        const statusText = document.getElementById('status-text');
 
         // ========================================================
-        // החזרת חיבור ה-WebSocket מול ה-ESP32
+        // הגדרת תקשורת WebSocket מול ה-ESP32 עם הגנה מפני קריסות
         // ========================================================
-        const esp32IP = "10.244.180.29"; // ודא שזה ה-IP האקטאולי מהסיריאל
-        const socket = new WebSocket(`ws://${esp32IP}:81`);
+        const esp32IP = "192.168.43.50"; // ודא שזה ה-IP הנוכחי של הבקר מהסיריאל
+        let socket = null;
 
-        socket.onopen = () => console.log("Connected to ESP32 Hardware!");
-        socket.onclose = () => console.log("Disconnected from ESP32");
-        socket.onerror = (error) => console.error("WebSocket Error: ", error);
+        try {
+            socket = new WebSocket(`ws://${esp32IP}:81`);
+
+            socket.onopen = () => {
+                console.log("Connected to ESP32 Hardware!");
+                statusText.setAttribute('value', 'ESP32: Connected! 🟢');
+                statusText.setAttribute('color', 'green');
+            };
+
+            socket.onclose = () => {
+                console.log("Disconnected from ESP32");
+                statusText.setAttribute('value', 'ESP32: Disconnected 🔴');
+                statusText.setAttribute('color', 'red');
+            };
+
+            socket.onerror = (error) => {
+                console.error("WebSocket Error: ", error);
+                statusText.setAttribute('value', 'ESP32: Connection Error ⚠️');
+                statusText.setAttribute('color', 'orange');
+            };
+        } catch (e) {
+            console.error("Failed to create WebSocket:", e);
+            statusText.setAttribute('value', 'ESP32: Setup Failed ❌');
+            statusText.setAttribute('color', 'red');
+        }
         // ========================================================
 
         // לולאת בדיקת התנגשויות (רצה בכל 50 מילישניות)
@@ -47,13 +72,10 @@
             });
         }, 50);
 
-        // ========================================================
         // מנגנון ייצור אוטומטי: בלון חדש בכל 3 שניות (3000ms)
-        // ========================================================
         setInterval(() => {
             spawnTarget();
         }, 3000); 
-        // ========================================================
 
         // פונקציית בדיקת מרחק והתנגשות
         function checkHandCollision(targetEntity, handEntity) {
@@ -69,18 +91,18 @@
                 Math.pow(targetPos.z - handPos.z, 2)
             );
 
-            // פגיעה בבלון (טווח של 25 ס"מ)
+            // פגיעה בבלון
             if (distance < 0.25) {
                 targetEntity.remove(); // מחיקת הבלון מהסצנה
                 
-                // שליחת פקודת הפיצוץ בצינור ל-ESP32
+                // שליחת פקודת הפיצוץ בצינור ל-ESP32 (רק אם החיבור פתוח ותקין)
                 if (socket && socket.readyState === WebSocket.OPEN) {
                     socket.send("BALLOON_POPPED");
                 }
             }
         }
 
-        // פונקציה לייצור בלונים אדומים במרחב הנגיש של החדר
+        // פונקציה לייצור בלונים אדומים
         function spawnTarget() {
             const newTarget = document.createElement('a-sphere');
             newTarget.setAttribute('class', 'target');
@@ -88,9 +110,9 @@
             newTarget.setAttribute('radius', '0.15');
 
             // מיקומים רנדומליים קרובים מול הפנים
-            const x = (Math.random() * 1.0) - 0.5;   // 50 ס"מ ימינה או שמאלה
-            const y = (Math.random() * 0.4) + 1.3;   // גובה נוח לידיים (1.3 עד 1.7 מטר)
-            const z = -(Math.random() * 0.5) - 0.4;  // מרחק קדימה (40 עד 90 ס"מ)
+            const x = (Math.random() * 1.0) - 0.5;   
+            const y = (Math.random() * 0.4) + 1.3;   
+            const z = -(Math.random() * 0.5) - 0.4;  
 
             newTarget.setAttribute('position', `${x} ${y} ${z}`);
             container.appendChild(newTarget);
