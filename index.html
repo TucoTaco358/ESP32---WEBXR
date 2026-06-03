@@ -30,7 +30,7 @@
         // ========================================================
         // חובה להחליף את ה-IP למטה ב-IP האמיתי שהבקר מקבל מההוטספוט שלך!
         const esp32IP = "10.244.180.29"; 
-        const socket = new WebSocket(`ws://${esp32IP}:81`);
+        //const socket = new WebSocket(`ws://${esp32IP}:81`);
 
         socket.onopen = () => {
             console.log("Connected to ESP32 Hardware WebSocket Server!");
