@@ -26,16 +26,14 @@
 
     <script>
         const container = document.getElementById('targets-container');
+        const sceneEl = document.querySelector('a-scene');
 
         // ה-WebSocket מנוטרל זמנית לבדיקה
         const socket = null;
 
         // ========================================================
-        // הלולאה המתמטית: רצה בכל פריים של ה-VR (60-90 פעמים בשנייה)
-        // היא בודקת את המרחק האמיתי בין הידיים לבלונים ללא תלות ב-Raycaster
+        // הלולאה המתמטית המתוקנת: רצה בכל פריים של ה-VR 
         // ========================================================
-        const sceneEl = document.querySelector('a-scene');
-        
         sceneEl.addEventListener('render-target-loaded', () => {
             sceneEl.renderer.setAnimationLoop((time, frame) => {
                 if (!frame) return;
@@ -44,35 +42,36 @@
                 const rightHandEl = document.getElementById('rightHand');
 
                 // בדיקת התנגשות עבור יד שמאל ויד ימין
-                checkCollision(leftHandEl, frame);
-                checkCollision(rightHandEl, frame);
+                if (leftHandEl) checkCollision(leftHandEl);
+                if (rightHandEl) checkCollision(rightHandEl);
             });
         });
 
-        function checkCollision(handEntity, frame) {
-            // ודא שהיד קיימת, נטענה בתוך A-Frame ונראית לעין
-            if (!handEntity || !handEntity.object3D || !handEntity.visible) return;
+        function checkCollision(handEntity) {
+            // ודא שהיד קיימת, נטענה בתוך A-Frame ונראית לעין במשקפיים
+            if (!handEntity || !handEntity.object3D || !handEntity.getAttribute('visible')) return;
 
-            // שליפת מיקום כף היד של המשתמש במרחב התלת-ממדי של החדר
+            // שליפת מיקום כף היד של המשתמש במרחב התלת-ממדי
             const handPos = new THREE.Vector3();
             handEntity.object3D.getWorldPosition(handPos);
 
             // לולאה שעוברת על כל הבלונים שקיימים כרגע במסך
             const targets = document.querySelectorAll('.target');
             targets.forEach(target => {
-                if (!target.object3D) return;
+                if (!target || !target.object3D) return;
 
                 const targetPos = new THREE.Vector3();
-                targetEntity = target;
                 target.object3D.getWorldPosition(targetPos);
 
                 // חישוב המרחק הוקטורי המדויק בין מרכז כף היד למרכז הבלון
                 const distance = targetPos.distanceTo(handPos);
 
-                // הגדרנו טווח פגיעה נדיב של 30 ס"מ (0.3 מטר)
+                // טווח פגיעה נדיב של 30 ס"מ (0.3 מטר)
                 if (distance < 0.30) {
                     // פוצץ ומחק את הבלון מהעולם במיידי!
-                    target.parentNode.removeChild(target);
+                    if (target.parentNode) {
+                        target.parentNode.removeChild(target);
+                    }
 
                     // שליחה ל-ESP32 (יופעל בהמשך כשנחזיר את ה-WebSocket)
                     if (socket && socket.readyState === 1) {
