@@ -2,13 +2,14 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>ESP32 XR Hand Press Game - Fixed Events</title>
+    <title>ESP32 AR Hand Press Game</title>
     <script src="https://cdn.jsdelivr.net/gh/aframevr/aframe@master/dist/aframe-master.min.js"></script>
     <script src="pressable.js"></script>
   </head>
   <body>
     
-    <a-scene webxr="requiredFeatures: local-floor, hand-tracking;">
+    <a-scene xr-mode-ui="XRMode: xr; enterAREnabled: true; enterVREnabled: false;" 
+             webxr="requiredFeatures: local-floor, hand-tracking; optionalFeatures: hit-test; referenceSpaceType: local-floor;">
       
       <a-sky id="background" color="#000000" material="transparent: true; opacity: 0;"></a-sky>
 
@@ -26,6 +27,14 @@
                 pressable>
       </a-entity>
 
+      <a-text id="connection-status" 
+              value="Connecting to ESP32..." 
+              color="orange" 
+              position="0 1.1 -0.4" 
+              scale="0.3 0.3 0.3" 
+              align="center">
+      </a-text>
+
       <a-entity hand-tracking-controls="hand: left"></a-entity>
       <a-entity hand-tracking-controls="hand: right"></a-entity>
       
@@ -33,74 +42,83 @@
 
     <script>
         const container = document.getElementById('targets-container');
+        const statusText = document.getElementById('connection-status');
 
         // ========================================================
-        // הגדרת תקשורת WebSocket מול ה-ESP32 (115200 Baud)
+        // הגדרת תקשורת WebSocket מול ה-ESP32 (Baud Rate: 115200)
         // ========================================================
-        const esp32IP = "192.168.43.50"; // ודא שזה ה-IP העדכני שמופיע ב-Serial Monitor
+        const esp32IP = "172.16.100.17"; // ודא שזה ה-IP העדכני שמופיע ב-Serial Monitor
         let socket = null;
 
-        try {
-            socket = new WebSocket(`ws://${esp32IP}:81`);
+        function connectWebSocket() {
+            try {
+                socket = new WebSocket(`ws://${esp32IP}:81`);
 
-            socket.onopen = () => {
-                console.log("Connected to ESP32! 🟢");
-            };
+                socket.onopen = () => {
+                    console.log("Connected to ESP32! 🟢");
+                    // עדכון האינדיקציה על המסך לירוק ומחובר
+                    statusText.setAttribute('value', 'ESP32 Connected 🟢');
+                    statusText.setAttribute('color', 'green');
+                };
 
-            socket.onclose = () => {
-                console.log("Disconnected from ESP32 🔴");
-            };
+                socket.onclose = () => {
+                    console.log("Disconnected from ESP32 🔴");
+                    // עדכון האינדיקציה לאדום ומנותק, וניסיון חיבור מחדש
+                    statusText.setAttribute('value', 'ESP32 Disconnected 🔴 (Retrying...)');
+                    statusText.setAttribute('color', 'red');
+                    setTimeout(connectWebSocket, 3000); // ניסיון התחברות מחדש כל 3 שניות
+                };
 
-            socket.onerror = (error) => {
-                console.error("WebSocket Error ⚠️", error);
-            };
-        } catch (e) {
-            console.error("WebSocket Setup Failed ❌", e);
+                socket.onerror = (error) => {
+                    console.error("WebSocket Error ⚠️", error);
+                };
+            } catch (e) {
+                console.error("WebSocket Setup Failed ❌", e);
+            }
         }
+
+        // הפעלת החיבור הראשוני
+        connectWebSocket();
         // ========================================================
 
-        // פונקציית ההאזנה לאירוע הנגיעה המדויק מתוך קובץ ה-js שלך (pressedstarted)
+        // פונקציית ההאזנה לאירוע הנגיעה (pressedstarted) מתוך קובץ ה-js
         function registerPressListener(element) {
             element.addEventListener('pressedstarted', function (evt) {
                 popTarget(evt.target);
             });
         }
 
-        // הפעלת ההקשבה על הבלון הכחול ההתחלתי
+        // הפעלת ההקשבה על הבלון הכחול
         registerPressListener(document.getElementById('test-balloon'));
 
         // פונקציית הפיצוץ, המחיקה והשליחה לחומרה
         function popTarget(targetEntity) {
             if (targetEntity && targetEntity.parentNode) {
-                // מחיקה מיידית מהמסך של ה-VR
+                // מחיקה מיידית מהמסך
                 targetEntity.parentNode.removeChild(targetEntity);
                 
-                // שליחת פקודת הפיצוץ ל-ESP32
+                // שליחת אות הפיצוץ ל-ESP32
                 if (socket && socket.readyState === WebSocket.OPEN) {
                     socket.send("BALLOON_POPPED");
                 }
             }
         }
 
-        // מנגנון ייצור אוטומטי: בלון אדום חדש מופיע בכל 3 שניות
+        // מנגנון ייצור אוטומטי של בלונים אדומים בכל 3 שניות
         setInterval(() => {
             const newTarget = document.createElement('a-entity');
             newTarget.setAttribute('class', 'target');
-            // יצירת הגאומטריה המפורשת בדיוק ברדיוס הנכון למגע (6 ס"מ)
             newTarget.setAttribute('geometry', 'primitive: sphere; radius: 0.06;');
             newTarget.setAttribute('material', 'color: red');
             newTarget.setAttribute('pressable', '');
 
-            // מיקומים רנדומליים קרובים מאוד ונוחים לנגיעה מול הגוף
-            const x = (Math.random() * 0.4) - 0.2;   // 20 ס"מ ימינה או שמאלה
-            const y = (Math.random() * 0.2) + 1.3;   // גובה החזה/סנטר
-            const z = -(Math.random() * 0.2) - 0.35; // קרוב מאוד (35 עד 55 ס"מ מהפנים)
+            const x = (Math.random() * 0.4) - 0.2;   
+            const y = (Math.random() * 0.2) + 1.3;   
+            const z = -(Math.random() * 0.2) - 0.35; 
 
             newTarget.setAttribute('position', `${x} ${y} ${z}`);
             
-            // רישום הבלון החדש להאזנת הנגיעה
             registerPressListener(newTarget);
-            
             container.appendChild(newTarget);
         }, 3000);
     </script>
