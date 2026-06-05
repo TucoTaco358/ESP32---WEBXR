@@ -1,56 +1,40 @@
-/**
- * קובץ רכיב מותאם עבור A-Frame - Pure Touch Detection Driver
- * מבוסס על הדוגמה הרשמית שעבדה - מקשיב לנגיעה פיזית של האצבע
- */
+/* global AFRAME, THREE */
 AFRAME.registerComponent('pressable', {
-  init: function () {
-    // מציאת כפות הידיים בסצנה
-    this.handEls = document.querySelectorAll('[hand-tracking-controls]');
-    this.pressed = false;
-    this.bindMethods();
+  schema: {
+    pressDistance: { default: 0.06 }
   },
 
-  bindMethods: function () {
-    this.checkPress = this.checkPress.bind(this);
+  init: function () {
+    this.worldPosition = new THREE.Vector3();
+    this.handEls = document.querySelectorAll('[hand-tracking-controls]');
+    this.pressed = false;
   },
 
   tick: function () {
-    // לולאה שרצה בכל פריים ובודקת האם אחת האצבעות נוגעת פיזית באובייקט
-    for (let i = 0; i < this.handEls.length; i++) {
-      this.checkPress(this.handEls[i]);
+    var handEls = this.handEls;
+    var handEl;
+    var distance;
+    for (var i = 0; i < handEls.length; i++) {
+      handEl = handEls[i];
+      distance = this.calculateFingerDistance(handEl.components['hand-tracking-controls'].indexTipPosition);
+      if (distance < this.data.pressDistance) {
+        if (!this.pressed) { this.el.emit('pressedstarted'); }
+        this.pressed = true;
+        return;
+      }
     }
+    if (this.pressed) { this.el.emit('pressedended'); }
+    this.pressed = false;
   },
 
-  checkPress: function (handEl) {
-    // ודא שחיישני היד נראים ופעילים
-    if (!handEl.components['hand-tracking-controls'] || !handEl.visible) return;
+  calculateFingerDistance: function (fingerPosition) {
+    var el = this.el;
+    var worldPosition = this.worldPosition;
 
-    const handComponents = handEl.components['hand-tracking-controls'];
-    const indexTip = handComponents.indexTip; // קצה האצבע המורה
+    worldPosition.copy(el.object3D.position);
+    el.object3D.parent.updateMatrixWorld();
+    el.object3D.parent.localToWorld(worldPosition);
 
-    // אם המשקפיים לא מזהים את קצה האצבע כרגע - עצור
-    if (!indexTip) return;
-
-    // שליפת המיקום המדויק של הבלון במרחב
-    const elPos = new THREE.Vector3();
-    this.el.object3D.getWorldPosition(elPos);
-
-    // חישוב המרחק בין קצה האצבע המורה של היד לבין מרכז הבלון
-    const distanceToIndex = indexTip.position.distanceTo(elPos);
-
-    // שליפת הרדיוס של הבלון (בקוד שלנו זה 0.12 מטר)
-    const radius = this.el.components.geometry.data.radius;
-
-    // אם האצבע נכנסה פיזית אל תוך גבולות הבלון (המרחק קטן מהרדיוס + טווח ביטחון קטן של נגיעה)
-    if (distanceToIndex < (radius + 0.05)) {
-      if (!this.pressed) {
-        this.pressed = true;
-        // יריקת אירוע חומרתי בשם 'pressed' שמפעיל את הפיצוץ
-        this.el.emit('pressed', { hand: handEl });
-      }
-    } else {
-      // ברגע שהיד יוצאת מהבלון, מאפסים את היכולת ללחוץ שוב
-      this.pressed = false;
-    }
+    return worldPosition.distanceTo(fingerPosition);
   }
 });
