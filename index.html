@@ -3,12 +3,12 @@
   <head>
     <meta charset="utf-8">
     <title>ESP32 XR Hand Tracking Target Game</title>
-    <script src="../../../dist/aframe-master.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/aframevr/aframe@master/dist/aframe-master.min.js"></script>
     <script src="pinchable.js"></script>
   </head>
   <body>
     
-    <a-scene webxr="requiredFeatures: local-floor, hand-tracking;">
+    <a-scene webxr="requiredFeatures: local-floor, hand-tracking; optionalFeatures: hit-test;">
       
       <a-sky id="background" color="#000000" material="transparent: true; opacity: 0;"></a-sky>
 
@@ -34,58 +34,77 @@
     <script>
         const container = document.getElementById('targets-container');
 
-        // ה-WebSocket מנוטרל זמנית לבדיקה ראשונית של הידיים
-        const socket = null;
+        // ========================================================
+        // הגדרת תקשורת WebSocket מול ה-ESP32
+        // ========================================================
+        const esp32IP = "192.168.43.50"; // ודא שזה ה-IP העדכני מהסיריאל מוניטור!
+        let socket = null;
 
+        try {
+            socket = new WebSocket(`ws://${esp32IP}:81`);
+
+            socket.onopen = () => {
+                console.log("Connected to ESP32! 🟢");
+            };
+
+            socket.onclose = () => {
+                console.log("Disconnected from ESP32 🔴");
+            };
+
+            socket.onerror = (error) => {
+                console.error("WebSocket Error ⚠️", error);
+            };
+        } catch (e) {
+            console.error("WebSocket Setup Failed ❌", e);
+        }
         // ========================================================
-        // פונקציית הקשבה לאירוע הצביטה (Pinch) הרשמי של A-Frame
-        // ========================================================
+
+        // פונקציה שמקשיבה לאירוע הצביטה הרשמי שיוצא מקובץ ה-JS השני
         function registerPinchListener(element) {
-            // ה-Quest 3 יורה אירוע בשם 'pinched' ברגע שהאצבעות נוגעות/צובטות את האובייקט
             element.addEventListener('pinched', function (evt) {
                 popTarget(evt.target);
             });
         }
 
-        // הפעלת ההקשבה על הבלון הכחול הקיים
+        // הפעלת ההקשבה על הבלון הכחול הקיים במסך
         registerPinchListener(document.getElementById('test-balloon'));
 
-        // פונקציית הפיצוץ והמחיקה
+        // פונקציית הפיצוץ, המחיקה והשליחה לבקר
         function popTarget(targetEntity) {
             if (targetEntity && targetEntity.parentNode) {
-                targetEntity.parentNode.removeChild(targetEntity); // מחיקה מיידית
+                // מחיקה מיידית מהמסך של המשקפיים
+                targetEntity.parentNode.removeChild(targetEntity);
                 
-                // שליחה ל-ESP32 בעתיד
-                if (socket && socket.readyState === 1) {
+                // שליחת פקודת הפיצוץ ל-ESP32 ברשת
+                if (socket && socket.readyState === WebSocket.OPEN) {
                     socket.send("BALLOON_POPPED");
                 }
             }
         }
-        // ========================================================
 
         // מנגנון ייצור אוטומטי: בלון אדום חדש בכל 3 שניות
         setInterval(() => {
             spawnTarget();
         }, 3000); 
 
-        // פונקציה לייצור בלונים אדומים קרובים ונוחים
+        // פונקציה לייצור בלונים אדומים קרובים ונוחים לצביטה
         function spawnTarget() {
             const newTarget = document.createElement('a-sphere');
             newTarget.setAttribute('class', 'target');
             newTarget.setAttribute('color', 'red');
             newTarget.setAttribute('radius', '0.12');
             
-            // הלבשת הרכיב pinchable גם על הבלונים החדשים שנוצרים באוויר!
+            // הלבשת רכיב החובה ה-pinchable על הבלון החדש
             newTarget.setAttribute('pinchable', '');
 
-            // מיקומים בטווח נגיעה קרוב מול הפנים
-            const x = (Math.random() * 0.4) - 0.2;   // 20 ס"מ ימינה או שמאלה
-            const y = (Math.random() * 0.3) + 1.3;   // גובה נוח
-            const z = -(Math.random() * 0.3) - 0.4;  // קרוב מאוד (40 עד 70 ס"מ)
+            // מיקומים רנדומליים קרובים מאוד מול הפנים (טווח של 40 עד 70 ס"מ)
+            const x = (Math.random() * 0.4) - 0.2;   
+            const y = (Math.random() * 0.3) + 1.3;   
+            const z = -(Math.random() * 0.3) - 0.4;  
 
             newTarget.setAttribute('position', `${x} ${y} ${z}`);
             
-            // הפעלת ההקשבה לצביטה גם על הבלון החדש
+            // רישום הבלון החדש למערכת ההאזנה של הצביטה
             registerPinchListener(newTarget);
             
             container.appendChild(newTarget);
