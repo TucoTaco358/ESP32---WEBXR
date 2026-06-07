@@ -2,14 +2,13 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>ESP32 AR Hand Press Game</title>
+    <title>ESP32 VR Connection Test</title>
     <script src="https://cdn.jsdelivr.net/gh/aframevr/aframe@master/dist/aframe-master.min.js"></script>
-    <script src="pressable.js"></script>
   </head>
   <body>
     
-    <a-scene xr-mode-ui="XRMode: xr; enterAREnabled: true; enterVREnabled: false;" 
-             webxr="requiredFeatures: local-floor, hand-tracking; optionalFeatures: hit-test; referenceSpaceType: local-floor;">
+    <a-scene xr-mode-ui="enabled: true; enterAREnabled: true; enterVREnabled: true;" 
+         webxr="optionalFeatures: local-floor, raycaster, hit-test;">
       
       <a-sky id="background" color="#000000" material="transparent: true; opacity: 0;"></a-sky>
 
@@ -17,110 +16,78 @@
         <a-camera id="head" look-controls="enabled: false" wasd-controls="enabled: false" position="0 1.6 0"></a-camera>
       </a-entity>
 
-      <a-entity id="targets-container"></a-entity>
-
-      <a-entity id="test-balloon" 
-                class="target"
-                geometry="primitive: sphere; radius: 0.06;" 
-                material="color: blue" 
-                position="0 1.4 -0.4"
-                pressable>
-      </a-entity>
-
       <a-text id="connection-status" 
-              value="Connecting to ESP32..." 
+              value="Connecting to ESP32 Hardware..." 
               color="orange" 
-              position="0 1.1 -0.4" 
-              scale="0.3 0.3 0.3" 
+              position="0 1.5 -0.5" 
+              scale="0.4 0.4 0.4" 
               align="center">
       </a-text>
 
-      <a-entity hand-tracking-controls="hand: left"></a-entity>
-      <a-entity hand-tracking-controls="hand: right"></a-entity>
+      <a-box id="test-target" 
+             class="raycastable"
+             position="0 1.1 -0.5" 
+             rotation="0 45 0" 
+             width="0.1" height="0.1" depth="0.1" 
+             material="color: #4CC3D9">
+      </a-box>
+
+      <a-entity laser-controls="hand: left" raycaster="objects: .raycastable; far: 5;"></a-entity>
+      <a-entity laser-controls="hand: right" raycaster="objects: .raycastable; far: 5;"></a-entity>
       
     </a-scene>
 
     <script>
-        const container = document.getElementById('targets-container');
         const statusText = document.getElementById('connection-status');
-
-        // ========================================================
-        // הגדרת תקשורת WebSocket מול ה-ESP32 (Baud Rate: 115200)
-        // ========================================================
-        const esp32IP = "172.16.100.17"; // ודא שזה ה-IP העדכני שמופיע ב-Serial Monitor
+        const testTarget = document.getElementById('test-target');
         let socket = null;
 
+        // ========================================================
+        // ניהול תקשורת ה-WebSocket מול ה-ESP32 (פורט 81)
+        // ========================================================
         function connectWebSocket() {
-            try {
-                socket = new WebSocket(`ws://${esp32IP}:81`);
+            // window.location.hostname מושך אוטומטית את ה-IP שהקלדת במשקפת
+            socket = new WebSocket(`ws://${window.location.hostname}:81`);
 
-                socket.onopen = () => {
-                    console.log("Connected to ESP32! 🟢");
-                    // עדכון האינדיקציה על המסך לירוק ומחובר
-                    statusText.setAttribute('value', 'ESP32 Connected 🟢');
-                    statusText.setAttribute('color', 'green');
-                };
+            socket.onopen = () => {
+                console.log("Connected to ESP32! 🟢");
+                statusText.setAttribute('value', 'ESP32 Connected 🟢');
+                statusText.setAttribute('color', 'green');
+            };
 
-                socket.onclose = () => {
-                    console.log("Disconnected from ESP32 🔴");
-                    // עדכון האינדיקציה לאדום ומנותק, וניסיון חיבור מחדש
-                    statusText.setAttribute('value', 'ESP32 Disconnected 🔴 (Retrying...)');
-                    statusText.setAttribute('color', 'red');
-                    setTimeout(connectWebSocket, 3000); // ניסיון התחברות מחדש כל 3 שניות
-                };
+            socket.onclose = () => {
+                console.log("Disconnected from ESP32 🔴");
+                statusText.setAttribute('value', 'ESP32 Disconnected 🔴 (Retrying...)');
+                statusText.setAttribute('color', 'red');
+                // ניסיון חיבור מחדש אוטומטי כל 3 שניות אם הניתוק לא מכוון
+                setTimeout(connectWebSocket, 3000); 
+            };
 
-                socket.onerror = (error) => {
-                    console.error("WebSocket Error ⚠️", error);
-                };
-            } catch (e) {
-                console.error("WebSocket Setup Failed ❌", e);
-            }
+            socket.onerror = (error) => {
+                console.error("WebSocket Error ⚠️", error);
+            };
         }
 
-        // הפעלת החיבור הראשוני
+        // הפעלת החיבור מיד עם טעינת הדף
         connectWebSocket();
         // ========================================================
 
-        // פונקציית ההאזנה לאירוע הנגיעה (pressedstarted) מתוך קובץ ה-js
-        function registerPressListener(element) {
-            element.addEventListener('pressedstarted', function (evt) {
-                popTarget(evt.target);
-            });
-        }
-
-        // הפעלת ההקשבה על הבלון הכחול
-        registerPressListener(document.getElementById('test-balloon'));
-
-        // פונקציית הפיצוץ, המחיקה והשליחה לחומרה
-        function popTarget(targetEntity) {
-            if (targetEntity && targetEntity.parentNode) {
-                // מחיקה מיידית מהמסך
-                targetEntity.parentNode.removeChild(targetEntity);
-                
-                // שליחת אות הפיצוץ ל-ESP32
-                if (socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send("BALLOON_POPPED");
-                }
-            }
-        }
-
-        // מנגנון ייצור אוטומטי של בלונים אדומים בכל 3 שניות
-        setInterval(() => {
-            const newTarget = document.createElement('a-entity');
-            newTarget.setAttribute('class', 'target');
-            newTarget.setAttribute('geometry', 'primitive: sphere; radius: 0.06;');
-            newTarget.setAttribute('material', 'color: red');
-            newTarget.setAttribute('pressable', '');
-
-            const x = (Math.random() * 0.4) - 0.2;   
-            const y = (Math.random() * 0.2) + 1.3;   
-            const z = -(Math.random() * 0.2) - 0.35; 
-
-            newTarget.setAttribute('position', `${x} ${y} ${z}`);
+        // האזנה ללחיצת ההדק (Trigger) בשלט כאשר הלייזר מצביע על הקובייה
+        testTarget.addEventListener('click', function (evt) {
+            // שינוי צבע זמני של הקובייה בירוק כאינדיקציה ויזואלית מיידית במשקפת
+            testTarget.setAttribute('material', 'color: #7BC8A4');
             
-            registerPressListener(newTarget);
-            container.appendChild(newTarget);
-        }, 3000);
+            // שליחת האות המדויק שה-ESP32 מצפה לו ב-onWebSocketEvent
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send("BALLOON_POPPED");
+                console.log("Sent: BALLOON_POPPED 💥");
+            }
+
+            // החזרת הצבע המקורי לאחר 200 מילישניות
+            setTimeout(() => {
+                testTarget.setAttribute('material', 'color: #4CC3D9');
+            }, 200);
+        });
     </script>
   </body>
 </html>
